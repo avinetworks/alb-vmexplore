@@ -1,2 +1,1 @@
-# vmexplore
-Demo code for presentations in the vmexplore
+# VMware Advanced Load Balancer VMexplore session and demo code
