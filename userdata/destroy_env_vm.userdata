@@ -1,0 +1,38 @@
+#cloud-config
+users:
+  - name: ubuntu
+    lock_passwd: true
+    shell: /bin/bash
+    sudo:  ALL=(ALL) NOPASSWD:ALL
+    chpasswd: {expire: False}
+    ssh_authorized_keys:
+      - ${pubkey}
+
+write_files:
+  - content: |
+      #!/bin/bash
+      sudo apt update
+      sudo apt install -y python3-pip python3-jmespath language-pack-en
+      pip3 install --upgrade pip
+      pip3 install ansible==${ansibleVersion}
+      pip3 install avisdk==${avisdkVersion}
+      sudo -u ubuntu ansible-galaxy install -f avinetworks.avisdk
+      pip3 install dnspython
+      pip3 install netaddr
+      sudo mkdir -p /etc/ansible
+      sudo tee /etc/ansible/ansible.cfg > /dev/null <<EOT
+      [defaults]
+      private_key_file = /home/${username}/.ssh/${privateKey}
+      host_key_checking = False
+      host_key_auto_add = True
+      EOT
+      echo "cloud init done" | tee /tmp/cloudInitDone.log
+    path: /opt/bootstrap.sh
+    permissions: 0755
+
+  - content: |
+      ubuntu ALL=(ALL) NOPASSWD:ALL
+    path: /etc/sudoers.d/ubuntu
+
+runcmd:
+  - /opt/bootstrap.sh

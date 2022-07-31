@@ -1,0 +1,39 @@
+#cloud-config
+users:
+  - default
+
+ssh_pwauth: True
+
+chpasswd:
+  list: |
+    ubuntu:${password}
+  expire: False
+
+hostname: ${hostname}
+
+write_files:
+  - encoding: base64
+    content: ${network_config}
+    path: ${net_plan_file}
+  - content: |
+      #!/bin/bash
+      if_name_primary=$(ip -o link show | awk -F': ' '{print $2}' | tail -1)
+      sed -i -e "s/if_name_primary_to_be_replaced/\"$if_name_primary\"/g" ${net_plan_file}
+      sudo sed -i -e 's/\"//g' ${net_plan_file}
+    path: /opt/replace_if_name_primary.sh
+    permissions: "0755"
+  - content: |
+      #!/bin/bash
+      # apt config
+      sudo apt update
+      echo "cloud init done" | tee /tmp/cloudInitDone.log
+    path: /opt/bootstrap.sh
+    permissions: "0755"
+  - content: |
+      network: {config: disabled}
+    path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+
+runcmd:
+  - /opt/replace_if_name_primary.sh
+  - netplan apply
+  - /opt/bootstrap.sh

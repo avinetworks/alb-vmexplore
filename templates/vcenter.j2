@@ -1,0 +1,19 @@
+{
+  "vcenter": {
+    "dc": "wdc-06-vc12",
+    "cluster": "wdc-06-vc12c01",
+    "datastore": "wdc-06-vc12c01-vsan",
+    "resource_pool": "wdc-06-vc12c01/Resources",
+    "folder": "{{ folder }}",
+    "management_network": {
+      "name": "vxw-dvs-34-virtualwire-3-sid-6120002-wdc-06-vc12-avi-mgmt"
+    },
+    "vip_network": {
+      "name": "vxw-dvs-34-virtualwire-120-sid-6120119-wdc-06-vc12-avi-dev116",
+      "cidr": "{{ cidr }}"
+    },
+    "k8s_network": {
+      "name": "vxw-dvs-34-virtualwire-116-sid-6120115-wdc-06-vc12-avi-dev112"
+    }
+  }
+}

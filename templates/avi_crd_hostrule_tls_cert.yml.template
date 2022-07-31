@@ -1,0 +1,13 @@
+apiVersion: ako.vmware.com/v1alpha1
+kind: HostRule
+metadata:
+  name: avi-crd-hostrule-tls-cert
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: ingress.${clusterName}.${domain}
+    enableVirtualHost: true
+    tls: # optional
+      sslKeyCertificate:
+        name: System-Default-Cert-EC
+        type: ref

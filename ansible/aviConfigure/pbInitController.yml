@@ -1,0 +1,89 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - "vars/params.yml"
+
+  collections:
+    - vmware.alb
+
+  tasks:
+    - name: Set variable avi_credentials
+      set_fact:
+        avi_credentials: >
+                          {'api_version': "{{ avi_version }}",
+                           'controller': "{{ controller_ip }}",
+                           'password': "{{ avi_password }}",
+                           'username': "{{ avi_username }}"}
+      tags:
+        - creds
+      when:
+        - avi_version is defined
+        - controller_ip is defined
+        - avi_password is defined
+        - avi_username is defined
+
+    - name: Debug variable avi_credentials
+      debug:
+        msg: "{{ avi_credentials }}"
+      tags:
+        - debug
+
+    - name: Update user admin password
+      vmware.alb.avi_useraccount:
+        controller: "{{ avi_credentials.controller }}"
+        username: "{{ avi_credentials.username }}"
+        password: "{{ avi_credentials.password }}"
+        old_password: 58NFaGDJm(PJH0G
+        api_version: "{{ avi_credentials.api_version }}"
+      ignore_errors: yes
+      tags:
+        - creds
+
+    - name: Setting up Random password for users
+      set_fact:
+        my_pass: "{{ my_pass | default([]) +  [ lookup('password', '/dev/null length=4 chars=ascii_lowercase') + '_' + lookup('password', '/dev/null length=4 chars=ascii_uppercase') + '-' + lookup('password', '/dev/null length=4 chars=digits') | upper ] }}"
+      loop: "{{ aviUser }}"
+      loop_control:
+        label: "Configuring {{ item.name }}"
+      when:
+        - aviUser is defined
+      tags:
+        - creds
+        - password
+    - name: user creation
+      vmware.alb.avi_user:
+        avi_credentials: "{{ avi_credentials }}"
+        name: "{{ item.0.name }}"
+        obj_username: "{{ item.0.name }}"
+        obj_password: "{{ item.1 }}"
+        access: "{{ item.0.access }}"
+        user_profile_ref: "{{ item.0.user_profile_ref }}"
+        is_active: "{{ item.0.is_active }}"
+        is_superuser: "{{ item.0.is_superuser }}"
+        default_tenant_ref: "{{ item.0.default_tenant_ref }}"
+      loop: "{{ aviUser|zip(my_pass)|list }}"
+      loop_control:
+        label: "Configuring {{ item.0.name }}"
+      when:
+        - aviUser is defined
+      tags:
+        - creds
+
+    - name: Change Avi Credentials - with Ansible user
+      set_fact:
+        avi_credentials: >
+                          {'api_version': "{{ avi_version }}",
+                           'controller': "{{ controller_ip }}",
+                          'password': "{{ my_pass.0 }}",
+                          'username': "{{ aviUser.0.name }}"}
+      tags:
+        - creds
+
+    - name: save json creds
+      copy:
+        content: '{"avi_credentials": {{ avi_credentials }} }'
+        dest: "{{ controller.aviCredsJsonFile | default('~/.creds.json') }}"
+      tags:
+        - creds

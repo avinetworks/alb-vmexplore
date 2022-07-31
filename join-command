@@ -1,0 +1,1 @@
+kubeadm join 100.100.100.200:6443 --token ix8v6j.br6f1erqwx90iuht --discovery-token-ca-cert-hash sha256:d53c9f6c038ed5f1ae004c09cc892aaaf6e0d64234a73b911dcba40a6c778655 

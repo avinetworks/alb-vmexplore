@@ -1,0 +1,22 @@
+packageList:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+keyUrl:
+  - https://download.docker.com/linux/ubuntu/gpg
+  - https://packages.cloud.google.com/apt/doc/apt-key.gpg
+repoUrl:
+  - deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ hostvars[inventory_hostname].ansible_distribution_release }} stable
+  - deb https://apt.kubernetes.io/ kubernetes-xenial main
+dockerVersion: 5:19.03.8~3-0~ubuntu-bionic
+k8sVersion: 1.18.2-00
+dockerK8sPackages:
+  - docker-ce={{ dockerVersion }}
+  - kubectl={{ k8sVersion }}
+  - kubelet={{ k8sVersion }}
+  - kubeadm={{ k8sVersion }}
+dockerUser: nic
+podNetworkCidr: 10.244.0.0/16
+networkingProviderUrl: https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml
