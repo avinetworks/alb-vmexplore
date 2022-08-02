@@ -1,4 +1,4 @@
-# tfVmwAkoK8sDemo
+# Terraform VMware Ako and K8s Demo
 
 ## Goal of this repo
 
