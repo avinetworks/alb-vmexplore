@@ -137,8 +137,8 @@ resource "null_resource" "k8s_bootstrap_master" {
     destination = "k8s_bootstrap_master.sh"
   }
   provisioner "file" {
-    source      = "templates/waftest.txt"
-    destination = "waftest.txt"
+    source      = "templates/steps.txt"
+    destination = "steps.txt"
   }
   provisioner "remote-exec" {
     inline = ["sudo /bin/bash k8s_bootstrap_master.sh"]

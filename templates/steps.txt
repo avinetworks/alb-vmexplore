@@ -1,0 +1,42 @@
+helm repo list
+
+helm search repo ako
+
+helm --debug install ako/ako --generate-name --version 1.7.1 -f values.yml --namespace=avi-system --set avicredentials.username=admin --set avicredentials.password=$avi_password
+
+k get pods -A
+
+k logs -f ako-0 -n avi-system
+
+k apply -f service_loadBalancer.yml
+
+k get svc
+
+k apply -f deployment.yml
+
+k get deploy
+
+k scale deployment web-front1 --replicas=6
+
+k apply -f service_clusterIP.yml
+
+k get svc
+
+k apply -f ingress.yml
+
+k get ing
+
+k apply -f avi_crd_hostrule_tls_cert.yml
+
+k get HostRule avi-crd-hostrule-tls-cert -o json | jq .status.status
+
+k get secrets
+
+k apply -f secure_ingress.yml
+
+k get ing
+
+k apply -f avi_crd_hostrule_waf.yml
+
+k get HostRule  avi-crd-hostrule-waf -o json | jq .status.status
+
