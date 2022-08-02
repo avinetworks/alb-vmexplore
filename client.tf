@@ -227,7 +227,7 @@ resource "null_resource" "update_ip_to_client_static" {
   }
 }
 locals {
-   static_or_dhcp = var.vcenter_network_mgmt_dhcp == true ? var.vcenter_network_mgmt_dhcp :  split(",", replace(var.vcenter_network_mgmt_ip4_addresses, " ", ""))[1]
+   static_or_dhcp = var.vcenter_network_mgmt_dhcp == true ? vsphere_virtual_machine.client_dhcp[0].default_ip_address :  split(",", replace(var.vcenter_network_mgmt_ip4_addresses, " ", ""))[1]
 }
 resource "null_resource" "waftest_client" {
   depends_on = [null_resource.add_nic_to_client]
