@@ -49,7 +49,7 @@ An orchestrator VM which has terraform and govc installed:
 
 ## Clone this repo:
 
-git clone https://github.com/tacobayle/tfVmwAkoK8sDemo
+git clone https://github.com/avinetworks/alb-vmexplore.git
 
 ## Variables:
 
