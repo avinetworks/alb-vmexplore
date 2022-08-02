@@ -26,6 +26,7 @@ write_files:
       #!/bin/bash
       # apt config
       sudo apt update
+      sudo apt install -y httpie
       echo "cloud init done" | tee /tmp/cloudInitDone.log
     path: /opt/bootstrap.sh
     permissions: "0755"
