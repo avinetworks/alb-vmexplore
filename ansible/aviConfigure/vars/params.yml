@@ -1,0 +1,78 @@
+---
+aviUser:
+  - name: ansible
+    is_superuser: true
+    user_profile_ref: "/api/useraccountprofile?name=Default-User-Account-Profile"
+    is_active: true
+    default_tenant_ref: "/api/tenant?name=admin"
+    access:
+      - role_ref: "/api/role?name=System-Admin"
+        tenant_ref: "/api/tenant/admin#admin"
+      - all_tenants: true
+        role_ref: "/api/role?name=System-Admin"
+    credsJsonFile: ../aviLscCloud/vars/creds.json
+  - name: terraform
+    is_superuser: true
+    user_profile_ref: "/api/useraccountprofile?name=Default-User-Account-Profile"
+    is_active: true
+    default_tenant_ref: "/api/tenant?name=admin"
+    access:
+      - role_ref: "/api/role?name=System-Admin"
+        tenant_ref: "/api/tenant/admin#admin"
+      - all_tenants: true
+        role_ref: "/api/role?name=System-Admin"
+    credsJsonFile: ../../terraform/aviVs/creds.tfvars.json
+  - name: python
+    is_superuser: true
+    user_profile_ref: "/api/useraccountprofile?name=Default-User-Account-Profile"
+    is_active: true
+    default_tenant_ref: "/api/tenant?name=admin"
+    access:
+      - role_ref: "/api/role?name=System-Admin"
+        tenant_ref: "/api/tenant/admin#admin"
+      - all_tenants: true
+        role_ref: "/api/role?name=System-Admin"
+    credsJsonFile: ../../python/aviVs/creds.json
+  - name: vrovra
+    is_superuser: true
+    user_profile_ref: "/api/useraccountprofile?name=Default-User-Account-Profile"
+    is_active: true
+    default_tenant_ref: "/api/tenant?name=admin"
+    access:
+      - role_ref: "/api/role?name=System-Admin"
+        tenant_ref: "/api/tenant/admin#admin"
+      - all_tenants: true
+        role_ref: "/api/role?name=System-Admin"
+
+healthMonitor:
+  - name: hm1
+    receive_timeout: 1
+    failed_checks: 2
+    send_interval: 1
+    successful_checks: 2
+    type: HEALTH_MONITOR_HTTP
+    http_request: "HEAD / HTTP/1.0"
+    http_response_code:
+      - HTTP_2XX
+      - HTTP_3XX
+      - HTTP_5XX
+
+packageList:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+
+keyUrl:
+  - https://download.docker.com/linux/ubuntu/gpg
+
+repoUrl:
+  - deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ hostvars[inventory_hostname].ansible_distribution_release }} stable
+
+dockerVersion: 5:18.09.5~3-0~ubuntu
+
+dockerPackages:
+  - docker-ce-cli={{ dockerVersion }}-{{ hostvars[inventory_hostname].ansible_distribution_release }}
+  - docker-ce={{ dockerVersion }}-{{ hostvars[inventory_hostname].ansible_distribution_release }}
+  - containerd.io

@@ -1,0 +1,100 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - "vars/params.yml"
+
+  collections:
+    - vmware.alb
+
+  tasks:
+    - name: Create Backup Configuration passphrase
+      vmware.alb.avi_backupconfiguration:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        state: present
+        backup_passphrase: "{{ avi_credentials.password }}"
+        name: Backup-Configuration
+        save_local: true
+      tags:
+        - system
+
+    - name: Define ntp_servers
+      set_fact:
+        ntp_servers: "{{ ntp_servers | default([]) + [{ 'server': {'type': 'V4', 'addr': item}}] }}"
+      loop: "{{ ntp_servers_ips }}"
+      when:
+        - ntp_servers_ips is defined
+        - ntp_servers_ips | length > 0
+
+    - name: Define dns_servers
+      set_fact:
+        server_list: "{{ server_list | default([]) + [{'type': 'V4', 'addr': item}] }}"
+      loop: "{{ dns_servers_ips }}"
+      when:
+        - dns_servers_ips is defined
+        - dns_servers_ips | length > 0
+
+    - name: Define avi_systemconfiguration
+      set_fact:
+        avi_systemconfiguration:
+          global_tenant_config:
+            se_in_provider_context: "{{ controller.se_in_provider_context | default('false') }}"
+            tenant_access_to_provider_se: "{{ controller.tenant_access_to_provider_se | default('true') }}"
+            tenant_vrf: "{{ controller.tenant_vrf | default('false') }}"
+          welcome_workflow_complete: true
+          ntp_configuration:
+            ntp_servers: "{{ ntp_servers | default(omit) }}"
+          dns_configuration:
+            search_domain: ''
+            server_list: "{{ server_list | default(omit) }}"
+          email_configuration:
+            from_email: "{{ controller.email_configuration | default('test@avicontroller.net') }}"
+            smtp_type: SMTP_LOCAL_HOST
+      when:
+        - ntp_servers is defined
+        - server_list is defined
+
+    - name: Configure Avi System parameters
+      vmware.alb.avi_systemconfiguration:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        global_tenant_config: "{{ avi_systemconfiguration.global_tenant_config }}"
+        dns_configuration: "{{ avi_systemconfiguration.dns_configuration }}"
+        ntp_configuration: "{{ avi_systemconfiguration.ntp_configuration }}"
+        email_configuration: "{{ avi_systemconfiguration.email_configuration }}"
+        welcome_workflow_complete: "{{ avi_systemconfiguration.welcome_workflow_complete }}"
+        default_license_tier: ENTERPRISE
+      when:
+        - avi_systemconfiguration is defined
+      tags:
+        - system
+
+    - name: Create HTTP health monitor
+      vmware.alb.avi_healthmonitor:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        name: "{{ item.name }}"
+        tenant: "{{ item.tenant_ref | default('admin') }}"
+        tenant_ref: "/api/tenant?name={{ item.tenant_ref | default('admin') }}"
+        http_monitor:
+          http_request: "{{ item.http_request }}"
+          http_response_code: "{{ item.http_response_code }}"
+        receive_timeout: "{{ item.receive_timeout }}"
+        failed_checks: "{{ item.failed_checks }}"
+        send_interval: "{{ item.send_interval }}"
+        successful_checks: "{{ item.successful_checks }}"
+        type: "{{ item.type }}"
+      loop: "{{ healthMonitor }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - healthMonitor is defined
+        - item.type == "HEALTH_MONITOR_HTTP"
+      tags:
+        - vsHttp
+        - hm
+        - pool
+        - vs

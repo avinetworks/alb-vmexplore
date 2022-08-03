@@ -1,0 +1,5 @@
+---
+- import_playbook: pbInitController.yml
+- import_playbook: pbSystemConfig.yml
+- import_playbook: vmw/pbCloudVmw.yml
+- import_playbook: vmw/pbVsVmw.yml

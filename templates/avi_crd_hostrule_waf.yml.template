@@ -1,0 +1,10 @@
+apiVersion: ako.vmware.com/v1alpha1
+kind: HostRule
+metadata:
+  name: avi-crd-hostrule-waf
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: secure-ingress.${clusterName}.${domain}
+    enableVirtualHost: true
+    wafPolicy: ${default_waf_policy}

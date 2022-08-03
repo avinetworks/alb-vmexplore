@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-front1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-front1
+  template:
+    metadata:
+      name: web-front1
+      labels:
+        app: web-front1
+    spec:
+      containers:
+        - name: web-front1
+          image: tacobayle/busybox-v1
+          command: [ "sh", "-c"]
+          args:
+          - while true; do
+              echo -e "HTTP/1.1 200 OK\n\n$(date)\nApp version is $(printenv AppVersion)\nNode is $(printenv MY_NODE_NAME)\nPod is $(printenv MY_POD_NAME)\nNamespace is $(printenv MY_POD_NAMESPACE)\nPod IP is $(printenv MY_POD_IP)\nPod Service account is $(printenv MY_POD_SERVICE_ACCOUNT)" | nc -l -p 80;
+            done;
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MY_POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+      restartPolicy: Always

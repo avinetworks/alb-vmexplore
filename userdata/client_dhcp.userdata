@@ -1,0 +1,40 @@
+#cloud-config
+users:
+  - default
+
+ssh_pwauth: True
+
+chpasswd:
+  list: |
+    ubuntu:${password}
+  expire: False
+
+hostname: ${hostname}
+
+write_files:
+  - content: |
+      #!/bin/bash
+      # apt config
+      sudo apt update
+      if_primary_name=$(ip route | grep default | sed -e "s/^.*dev.//" -e "s/.proto.*//")
+      ip=$(ip address show dev $if_primary_name | grep -v inet6 | grep inet | awk '{print $2}' | awk -F'/' '{print $1}')
+      prefix_length=$(ip address show dev $if_primary_name | grep -v inet6 | grep inet | awk '{print $2}' | awk -F'/' '{print $2}')
+      gw=$(ip route show 0.0.0.0/0 | awk '{print $3}')
+      sed -i -e "s/if_name_primary_to_be_replaced/\"$if_primary_name\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/ip_to_be_replaced/\"$ip\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/prefix_length_to_be_replaced/\"$prefix_length\"/g" /tmp/50-cloud-init.yaml
+      sed -i -e "s/gw_to_be_replaced/\"$gw\"/g" /tmp/50-cloud-init.yaml
+      sudo sed -i -e 's/\"//g' /tmp/50-cloud-init.yaml
+      echo "cloud init done" | tee /tmp/cloudInitDone.log
+      sudo apt install -y httpie
+    path: /opt/bootstrap.sh
+    permissions: "0755"
+  - content: |
+      network: {config: disabled}
+    path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+  - encoding: base64
+    content: ${network_config_static}
+    path: /tmp/50-cloud-init.yaml
+
+runcmd:
+  - /opt/bootstrap.sh

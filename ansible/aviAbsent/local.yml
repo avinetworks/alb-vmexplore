@@ -1,0 +1,315 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  collections:
+    - vmware.alb
+
+  tasks:
+    - name: Debug
+      debug:
+        msg: "{{ avi_credentials }}"
+      tags:
+        - debug
+
+    - name: Get GSLB list
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        path: gslbservice
+      prefix: gslb
+      register: gslbserviceResults
+      ignore_errors: yes
+
+    - name: Delete Glsb services - it may fails if not executed in the leader cluster
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"gslbservice/" + item.uuid }}'
+      prefix: delete_gslb
+      ignore_errors: yes
+      loop: "{{ gslbserviceResults.obj.results }}"
+
+    - name: Get GSLB profile
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        path: gslbgeodbprofile
+      prefix: gslb_profile
+      register: gslbgeodbprofileResults
+      ignore_errors: yes
+
+    - name: Delete Glsb Geo profile - it may fails if not executed in the leader cluster
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"gslbgeodbprofile/" + item.uuid }}'
+      prefix: delete_gslb_profile
+      loop: "{{ gslbgeodbprofileResults.obj.results }}"
+      ignore_errors: yes
+
+    - name: Get GSLB config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        path: gslb
+      prefix: get_gslb_config
+      loop: "{{ gslbgeodbprofileResults.obj.results }}"
+      register: gslbResults
+      ignore_errors: yes
+
+    - name: Delete Glsb config - it may fails if not executed in the leader cluster
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"gslb/" + item.uuid }}'
+      prefix: delete_gslb_config
+      loop: "{{ gslbResults.obj.results }}"
+      ignore_errors: yes
+
+    - name: get DNS VS used by system
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: systemconfiguration
+      prefix: get_dns_vs
+      register: systemconfigurationOutput
+      ignore_errors: yes
+
+    - name: Delete DNS VS used by system in systemconfiguration
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: patch
+        timeout: 300
+        path: systemconfiguration
+        data: {"delete":{"dns_virtualservice_refs":["{{ item }}"]}}
+      prefix: delete_dns_vs
+      loop: "{{ systemconfigurationOutput.obj.dns_virtualservice_refs }}"
+      when: systemconfigurationOutput.obj.dns_virtualservice_refs is defined
+      ignore_errors: yes
+
+    - name: get VS
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: virtualservice
+      prefix: get_vs
+      register: virtualserviceResults
+      ignore_errors: yes
+
+    - name: Delete child VS config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_child_vs
+      loop: "{{ virtualserviceResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+      when:
+        - item.type != "VS_TYPE_VH_PARENT"
+
+    - name: Delete all other VS config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_all_other_vs_config
+      loop: "{{ virtualserviceResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+      when:
+        - item.type == "VS_TYPE_VH_PARENT"
+
+    - name: Delete all VS config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_all_vs_config
+      loop: "{{ virtualserviceResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get vsvip
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: vsvip
+      prefix: get_vsvip
+      register: vsvipResults
+      ignore_errors: yes
+
+    - name: Delete vsvip config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"vsvip/" + item.uuid }}'
+      prefix: delete_vsvip
+      loop: "{{ vsvipResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get http policies
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: httppolicyset
+      prefix: get_http_policy
+      register: httppolicysetResults
+      ignore_errors: yes
+
+    - name: Delete http policies
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"httppolicyset/" + item.uuid }}'
+      prefix: delete_http_policy
+      loop: "{{ httppolicysetResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get l4 policies
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: l4policyset
+      prefix: get_l4_policy
+      register: l4policysetResults
+      ignore_errors: yes
+
+    - name: Delete l4 policies
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"l4policyset/" + item.uuid }}'
+      prefix: delete_l4_policy
+      loop: "{{ l4policysetResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get vs datascript
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: vsdatascriptset
+      prefix: get_vs_datascript
+      register: vsdatascriptsetResults
+      ignore_errors: yes
+
+    - name: Delete vs datascript
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"vsdatascriptset/" + item.uuid }}'
+      prefix: delete_vs_datascript
+      loop: "{{ vsdatascriptsetResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get pool groups
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: poolgroup
+      prefix: get_pool_groups
+      register: poolgroupResults
+      ignore_errors: yes
+
+    - name: Delete pool group config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"poolgroup/" + item.uuid }}'
+      prefix: delete_pool_groups
+      loop: "{{ poolgroupResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: get pools
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: pool
+      prefix: get_pools
+      register: poolResults
+      ignore_errors: yes
+
+    - name: Delete pool config
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"pool/" + item.uuid }}'
+      prefix: delete_pool_config
+      loop: "{{ poolResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: Get SE list
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        path: serviceengine
+      prefix: get_se_list
+      loop: "{{ poolResults.obj.results }}"
+      register: serviceengineResults
+      ignore_errors: yes
+
+    - name: Delete SE
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "delete"
+        path: '{{"serviceengine/" + item.uuid }}'
+      prefix: delete_se
+      loop: "{{ serviceengineResults.obj.results }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: yes
+
+    - name: Pausing for 20 seconds
+      pause:
+        seconds: 20
