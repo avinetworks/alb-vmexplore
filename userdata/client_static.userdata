@@ -17,6 +17,8 @@ write_files:
     path: ${net_plan_file}
   - content: |
       #!/bin/bash
+      sudo apt update
+      sudo apt install -y httpie
       if_name_primary=$(ip -o link show | awk -F': ' '{print $2}' | tail -1)
       sed -i -e "s/if_name_primary_to_be_replaced/\"$if_name_primary\"/g" ${net_plan_file}
       sudo sed -i -e 's/\"//g' ${net_plan_file}
@@ -26,7 +28,6 @@ write_files:
       #!/bin/bash
       # apt config
       sudo apt update
-      sudo apt install -y httpie
       echo "cloud init done" | tee /tmp/cloudInitDone.log
     path: /opt/bootstrap.sh
     permissions: "0755"
