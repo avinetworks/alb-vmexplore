@@ -19,6 +19,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: get
         path: gslbservice
+      prefix: gslb
       register: gslbserviceResults
       ignore_errors: yes
 
@@ -28,6 +29,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"gslbservice/" + item.uuid }}'
+      prefix: delete_gslb
       ignore_errors: yes
       loop: "{{ gslbserviceResults.obj.results }}"
 
@@ -37,6 +39,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: get
         path: gslbgeodbprofile
+      prefix: gslb_profile
       register: gslbgeodbprofileResults
       ignore_errors: yes
 
@@ -46,6 +49,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"gslbgeodbprofile/" + item.uuid }}'
+      prefix: delete_gslb_profile
       loop: "{{ gslbgeodbprofileResults.obj.results }}"
       ignore_errors: yes
 
@@ -55,6 +59,8 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: get
         path: gslb
+      prefix: get_gslb_config
+      loop: "{{ gslbgeodbprofileResults.obj.results }}"
       register: gslbResults
       ignore_errors: yes
 
@@ -64,6 +70,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"gslb/" + item.uuid }}'
+      prefix: delete_gslb_config
       loop: "{{ gslbResults.obj.results }}"
       ignore_errors: yes
 
@@ -74,6 +81,7 @@
         http_method: get
         timeout: 300
         path: systemconfiguration
+      prefix: get_dns_vs
       register: systemconfigurationOutput
       ignore_errors: yes
 
@@ -85,6 +93,7 @@
         timeout: 300
         path: systemconfiguration
         data: {"delete":{"dns_virtualservice_refs":["{{ item }}"]}}
+      prefix: delete_dns_vs
       loop: "{{ systemconfigurationOutput.obj.dns_virtualservice_refs }}"
       when: systemconfigurationOutput.obj.dns_virtualservice_refs is defined
       ignore_errors: yes
@@ -96,6 +105,7 @@
         http_method: get
         timeout: 300
         path: virtualservice
+      prefix: get_vs
       register: virtualserviceResults
       ignore_errors: yes
 
@@ -105,6 +115,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_child_vs
       loop: "{{ virtualserviceResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -118,6 +129,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_all_other_vs_config
       loop: "{{ virtualserviceResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -131,6 +143,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"virtualservice/" + item.uuid }}'
+      prefix: delete_all_vs_config
       loop: "{{ virtualserviceResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -143,6 +156,7 @@
         http_method: get
         timeout: 300
         path: vsvip
+      prefix: get_vsvip
       register: vsvipResults
       ignore_errors: yes
 
@@ -152,6 +166,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"vsvip/" + item.uuid }}'
+      prefix: delete_vsvip
       loop: "{{ vsvipResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -164,6 +179,7 @@
         http_method: get
         timeout: 300
         path: httppolicyset
+      prefix: get_http_policy
       register: httppolicysetResults
       ignore_errors: yes
 
@@ -173,6 +189,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"httppolicyset/" + item.uuid }}'
+      prefix: delete_http_policy
       loop: "{{ httppolicysetResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -185,6 +202,7 @@
         http_method: get
         timeout: 300
         path: l4policyset
+      prefix: get_l4_policy
       register: l4policysetResults
       ignore_errors: yes
 
@@ -194,6 +212,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"l4policyset/" + item.uuid }}'
+      prefix: delete_l4_policy
       loop: "{{ l4policysetResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -206,6 +225,7 @@
         http_method: get
         timeout: 300
         path: vsdatascriptset
+      prefix: get_vs_datascript
       register: vsdatascriptsetResults
       ignore_errors: yes
 
@@ -215,6 +235,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"vsdatascriptset/" + item.uuid }}'
+      prefix: delete_vs_datascript
       loop: "{{ vsdatascriptsetResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -227,6 +248,7 @@
         http_method: get
         timeout: 300
         path: poolgroup
+      prefix: get_pool_groups
       register: poolgroupResults
       ignore_errors: yes
 
@@ -236,6 +258,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"poolgroup/" + item.uuid }}'
+      prefix: delete_pool_groups
       loop: "{{ poolgroupResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -248,6 +271,7 @@
         http_method: get
         timeout: 300
         path: pool
+      prefix: get_pools
       register: poolResults
       ignore_errors: yes
 
@@ -257,6 +281,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"pool/" + item.uuid }}'
+      prefix: delete_pool_config
       loop: "{{ poolResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
@@ -268,6 +293,8 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: get
         path: serviceengine
+      prefix: get_se_list
+      loop: "{{ poolResults.obj.results }}"
       register: serviceengineResults
       ignore_errors: yes
 
@@ -277,6 +304,7 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: "delete"
         path: '{{"serviceengine/" + item.uuid }}'
+      prefix: delete_se
       loop: "{{ serviceengineResults.obj.results }}"
       loop_control:
         label: "{{ item.name }}"
