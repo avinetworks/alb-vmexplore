@@ -11,3 +11,6 @@ spec:
       sslKeyCertificate:
         name: System-Default-Cert-EC
         type: ref
+        alternateCertificate:
+          name: System-Default-Cert
+          type: ref
