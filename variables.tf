@@ -105,6 +105,10 @@ variable "vcenter_network_k8s_ipam_pool" {
   default = "100.100.100.100 - 100.100.100.199"
 }
 
+# This options set the L4 VS. Changed it to  LARGE to host more IPs or Dedicated to have sperated VSs .
+variable "shardVSSize" {
+  default = "SMALL"
+}
 variable "avi_version" {
   default = "21.1.4"
 }
