@@ -11,7 +11,7 @@ data "template_file" "values" {
     subnetPrefix = split("/", var.vcenter_network_vip_cidr)[1]
     networkName = var.vcenter_network_vip_name
     serviceType = local.ako_service_type
-    shardVSSize = "SMALL"
+    shardVSSize = var.shardVSSize
     serviceEngineGroupName = "Default-Group"
     controllerVersion = var.avi_version
     cloudName = "dc1_vCenter"
