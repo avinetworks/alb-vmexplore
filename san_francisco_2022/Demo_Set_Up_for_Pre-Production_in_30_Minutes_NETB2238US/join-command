@@ -1,0 +1,1 @@
+kubeadm join 100.100.100.200:6443 --token pcpmut.ojimzrtpw0dhcfsq --discovery-token-ca-cert-hash sha256:c882c41342a0c6d04ee71e645f736948cf84d658f00c0954b8ca2d44d4fc432b 
