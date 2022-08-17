@@ -1,3 +1,5 @@
+k get no
+
 helm repo list
 
 helm search repo ako
