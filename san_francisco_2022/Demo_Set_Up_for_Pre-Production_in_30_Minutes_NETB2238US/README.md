@@ -132,10 +132,10 @@ $(terraform output -json | jq -r .Destroy_command_avi_config_only.value) ; terra
   - All the VS are reachable by connecting to the client VM using the FQDN of the VS
   - Be patient when you try to test the app from the client VM: the DNS registration takes a bit of time
   - Prior to deploying the ako on each single cluster, always make sure of the status (Ready) of the k8s clusters by using such command below:
-  ```
-  k get nodes -o wide
-  ```
-- connect to the master node using ssh (username and password are part of the terraform outputs)
+    ```shell
+    k get nodes -o wide
+    ```
+- Connect to the master node using ssh (username and password are part of the terraform outputs)
 - AKO installation (this can be done prior or during the demo)
   - On the master node: make sure that the AKO repo has been added to helm
     ```shell
