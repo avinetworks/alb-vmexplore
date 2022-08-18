@@ -1,0 +1,93 @@
+avi_config:
+  virtualservice:
+    - name: "{{demo_applications.Hackazon.name}}"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      tenant: "{{avi_tenant}}"
+      cloud_ref: "/api/cloud/?name={{avi_appication_cloud}}"
+      services:
+        - port: 80
+          enable_ssl: False
+        - port: 443
+          enable_ssl: True
+      pool_ref: "/api/pool?name={{demo_applications.Hackazon.name}}-pool"
+      vsvip_ref: "/api/vsvip/?name={{demo_applications.Hackazon.name}}-vsvip"
+      waf_policy_ref: "/api/wafpolicy?name={{demo_applications.Hackazon.name}}-wafpolicy"
+      application_profile_ref: "/api/applicationprofile/?name=System-HTTP"
+      #bot_policy_ref: "/api/botdetectionpolicy/?name="
+      analytics_policy:
+        udf_log_throttle: 10
+        full_client_logs:
+          duration: 0
+          throttle: 10
+          enabled: True
+        metrics_realtime_update:
+          duration: 0
+          enabled: True
+        significant_log_throttle: 10
+        all_headers: True
+  pool:
+    - name: "{{demo_applications.Hackazon.name}}-pool"
+      cloud_ref: "/api/cloud/?name={{avi_appication_cloud}}"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      lb_algorithm: LB_ALGORITHM_LEAST_CONNECTIONS
+      default_server_port: 80
+      health_monitor_refs: 
+        - "/api/healthmonitor?name=System-TCP"
+      analytics_policy:
+        enable_realtime_metrics: True
+      tenant: "{{avi_tenant}}"
+      servers:
+        - ip:
+             addr: "{{demo_applications.Hackazon.pool_servers.server1.pool_server_ip}}"
+             type: 'V4'
+          port: 80
+          hostname: server1
+  vsvip:
+    - cloud_ref: "/api/cloud/?name={{avi_appication_cloud}}"
+      name: "{{demo_applications.Hackazon.name}}-vsvip"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      tenant: "{{avi_tenant}}"
+      vip:
+      - ip_address:
+          addr: "{{ demo_applications.Hackazon.vip_ip}}"
+          type: V4
+        vip_id: '1'
+  wafpolicy:
+    - name: "{{demo_applications.Hackazon.name}}-wafpolicy"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      waf_profile_ref: "/api/wafprofile/?name=System-WAF-Profile"
+      tenant: "{{avi_tenant}}"
+      enable_app_learning: true
+      enable_auto_rule_updates: true
+      enable_regex_learning: false
+      learning_params:
+        enable_per_uri_learning: true
+        update_interval: 1
+      crs_overrides:
+        - enable: true
+          name: "CRS_942_Application_Attack_SQLi"
+          exclude_list:
+            - match_element: "ARGS:password"
+              uri_path: "/exception_path"
+        - enable: false
+          name: "CRS_933_Application_Attack_PHP"
+      positive_security_model:
+        group_refs: ["/api/wafpolicypsmgroup/?name={{demo_applications.Hackazon.name}}-psmg"]
+      waf_crs_ref: "/api/wafcrs/?name=CRS-2021-4"
+  
+  errorpageprofile:
+    - name: "{{demo_applications.Hackazon.name}}-errorpage"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      tenant: "{{avi_tenant}}"
+      error_pages:
+        - error_page_body_ref: "/api/errorpagebody/?name=Custom-Error-Page"
+          index: 0
+          match: 
+            match_criteria: 'IS_IN'
+            status_codes: [403]
+
+  wafpolicypsmgroup:
+    - name: "{{demo_applications.Hackazon.name}}-psmg"
+      tenant_ref: "/api/tenant/?name={{avi_tenant}}"
+      tenant: "{{avi_tenant}}"
+      is_learning_group: true
