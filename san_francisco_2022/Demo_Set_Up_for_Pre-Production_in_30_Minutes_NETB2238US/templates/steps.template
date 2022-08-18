@@ -4,7 +4,7 @@ helm repo list
 
 helm search repo ako
 
-helm --debug install ako/ako --generate-name --version 1.7.1 -f values.yml --namespace=avi-system --set avicredentials.username=admin --set avicredentials.password=$avi_password
+helm --debug install ako/ako --generate-name --version ${ako_versions} -f values.yml --namespace=avi-system --set avicredentials.username=admin --set avicredentials.password=$avi_password
 
 k get pods -A
 
