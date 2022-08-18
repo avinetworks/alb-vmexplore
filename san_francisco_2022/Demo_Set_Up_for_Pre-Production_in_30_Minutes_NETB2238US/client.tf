@@ -241,6 +241,6 @@ resource "null_resource" "waftest_client" {
   }
   provisioner "file" {
     source      = "templates/waftest.txt"
-    destination = "waftest.txt"
+    destination = "steps.txt"
   }
 }
