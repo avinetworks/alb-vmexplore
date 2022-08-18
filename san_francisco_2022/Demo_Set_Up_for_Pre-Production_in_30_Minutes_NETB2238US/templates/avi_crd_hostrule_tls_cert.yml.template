@@ -14,3 +14,8 @@ spec:
         alternateCertificate:
           name: System-Default-Cert
           type: ref
+    analyticsPolicy: # optional
+      fullClientLogs:
+        enabled: true
+        throttle: HIGH
+      logAllHeaders: true
