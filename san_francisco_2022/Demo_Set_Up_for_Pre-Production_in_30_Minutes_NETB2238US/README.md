@@ -287,5 +287,35 @@ $(terraform output -json | jq -r .Destroy_command_avi_config_only.value) ; terra
   - Triggers WAF results
     ![Alt text](img/waf-results.png?raw=true "WAF Results")
 
-- Credits
+## Extra Hackazon Demo
+I have added the file to build an Hackazon. In order to demo that you will have to do a few extra steps:
+
+Create a new user on the client machine using the
+
+    adduser demo
+
+Once the user is set you will be able to ssh into the client machine and use the -D option to forward traffic
+
+    ssh -D 8080 demo@clientmachine
+
+In my /etc/host I have this:
+
+    172.16.1.104 hackazon.default.avi.com
+
+Now use Firefox and set the proxy to localhost port 8080
+
+![Alt text](img/firefox_proxy.png?raw=true "Firefox Proxy")
+
+You will also need to add a host entry on your machine as you cannot resolve the ingress FQDN
+
+![Alt text](img/hackazon.png?raw=true "Hackazon Page")
+
+
+
+Firefox will now be able to open the page, and you can check the logs on the Avi Controller. 
+
+
+<sub><sup>
+Credits
   Nicolas Bayle who started this project and myself fine tuned the code so it can be used in any vSphere env.
+<sub/><sup/>
