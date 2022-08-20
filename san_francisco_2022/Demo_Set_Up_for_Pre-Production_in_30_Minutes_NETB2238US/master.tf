@@ -122,6 +122,14 @@ data "template_file" "k8s_bootstrap_master" {
   }
 }
 
+data "template_file" "steps_file" {
+  template = file("${path.module}/templates/steps.template")
+  vars = {
+   ako_versions = var.ako_version
+  }
+}
+
+
 resource "null_resource" "k8s_bootstrap_master" {
   depends_on = [null_resource.add_nic_to_master]
 
@@ -137,7 +145,7 @@ resource "null_resource" "k8s_bootstrap_master" {
     destination = "k8s_bootstrap_master.sh"
   }
   provisioner "file" {
-    source      = "templates/steps.txt"
+    content     = data.template_file.steps_file.rendered
     destination = "steps.txt"
   }
   provisioner "remote-exec" {
