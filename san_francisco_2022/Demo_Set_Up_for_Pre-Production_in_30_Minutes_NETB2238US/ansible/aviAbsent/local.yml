@@ -55,7 +55,6 @@
         api_context: "{{ avi_api_context | default(omit) }}"
         http_method: get
         path: gslb
-      loop: "{{ gslbgeodbprofileResults.obj.results }}"
       register: gslbResults
       ignore_errors: yes
 
