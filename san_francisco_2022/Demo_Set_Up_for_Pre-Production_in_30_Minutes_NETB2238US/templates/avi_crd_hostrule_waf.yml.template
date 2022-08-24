@@ -9,6 +9,7 @@ spec:
     fqdn: secure-ingress.cluster1.avi.com
     enableVirtualHost: true
     wafPolicy: System-WAF-Policy
+    errorPageProfile: custom_avi_error_page_profile
     analyticsPolicy: # optional
       fullClientLogs:
         enabled: true
