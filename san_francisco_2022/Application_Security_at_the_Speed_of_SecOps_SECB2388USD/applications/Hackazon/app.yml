@@ -1,0 +1,19 @@
+# This is playbook for an application.
+# This can invoke any of the avi roles like application, profile or cloud
+#
+---
+- hosts: localhost
+  connection: local
+  collections:
+    - vmware.alb
+  vars:
+    app_name: Hackazon
+  tasks:
+    - name: Avi Application | Setup "{{ app_name }}"
+      no_log: False
+      import_role:
+        name: aviconfig
+      vars:
+        avi_config_file: "{{ site_dir }}/applications/{{app_name}}/config.yml"
+        avi_role_config_log_mode: False
+        avi_creds_file: "{{ site_dir }}/vars/{{deployment_target | default('staging')}}/creds.yml"
