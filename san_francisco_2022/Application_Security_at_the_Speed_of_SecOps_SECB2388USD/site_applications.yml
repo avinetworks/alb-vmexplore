@@ -1,0 +1,6 @@
+# List of applications to be included as part of the site.
+# This can be converted into a while loop over the directories.
+#
+
+- import_playbook: applications/Hackazon/app.yml
+
