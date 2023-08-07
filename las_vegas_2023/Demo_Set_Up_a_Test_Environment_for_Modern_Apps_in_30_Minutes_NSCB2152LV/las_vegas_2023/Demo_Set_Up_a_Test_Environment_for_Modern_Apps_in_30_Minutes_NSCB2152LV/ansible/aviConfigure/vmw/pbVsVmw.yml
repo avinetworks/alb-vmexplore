@@ -1,0 +1,70 @@
+---
+- hosts: localhost
+  connection: local
+
+  collections:
+    - vmware.alb
+
+  tasks:
+    - name: Create vsvip for dns VS - VMW
+      vmware.alb.avi_vsvip:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        name: "dns-vsvip"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        dns_info:
+          - fqdn: "dns.{{ avi_domain }}"
+        vip:
+          - auto_allocate_ip: true
+            ipam_network_subnet:
+              network_ref: "/api/network/?name={{ vcenter_network_vip_name }}"
+              subnet:
+                mask: "{{ vcenter_network_vip_cidr.split('/')[1] }}"
+                ip_addr:
+                  type: "V4"
+                  addr: "{{ vcenter_network_vip_cidr.split('/')[0] }}"
+
+    - name: Create DNS Virtualservice (based on vsvip)
+      vmware.alb.avi_virtualservice:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        name: "dns"
+        application_profile_ref: "/api/applicationprofile/?name=System-DNS"
+        network_profile_ref: "/api/networkprofile/?name=System-UDP-Per-Pkt"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        services:
+          - port: 53
+        vsvip_ref: "/api/vsvip/?name=dns-vsvip"
+        analytics_policy:
+          udf_log_throttle: 0
+          metrics_realtime_update:
+            duration: 0
+            enabled: true
+          significant_log_throttle: 0
+          client_insights: NO_INSIGHTS
+          full_client_logs:
+            duration: 0
+            throttle: 0
+            enabled: true
+          all_headers: false
+
+    - name: Update system config with first DNS VS
+      vmware.alb.avi_systemconfiguration:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        avi_api_patch_op : add
+        avi_api_update_method: patch
+        dns_virtualservice_refs: "/api/virtualservice/?name=dns"
+
+    - name: Wait for the First VS to be up
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: virtualservice-inventory
+        tenant: "admin"
+      register: statusVs
+      until: statusVs.obj.results.0.runtime.oper_status.state == "OPER_UP"
+      retries: 120
+      delay: 10

@@ -1,0 +1,31 @@
+---
+- hosts: master
+  gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+    - name: Spin up Deployment
+      shell: |
+        kubectl apply -f "{{ item.url }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+        - deployment
+      loop: "{{ kubernetes.deployments }}"
+      when:
+        - kubernetes.deployments is defined
+
+    - name: Spin up Services
+      shell: |
+        kubectl apply -f "{{ item.url }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+        - deployment
+      loop: "{{ kubernetes.services }}"
+      when:
+        - kubernetes.deployments is defined

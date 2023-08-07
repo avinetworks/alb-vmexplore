@@ -1,0 +1,373 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  collections:
+    - vmware.alb
+
+  tasks:
+
+    - name: Create Avi DNS provider Without donain names
+      vmware.alb.avi_ipamdnsproviderprofile:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        name: "dns-avi"
+        type: IPAMDNS_TYPE_INTERNAL_DNS
+      when:
+        - avi_domain is defined
+
+    - name: Update Avi DNS provider With donain names
+      vmware.alb.avi_ipamdnsproviderprofile:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        avi_api_patch_op: add
+        avi_api_update_method: patch
+        internal_profile:
+          dns_service_domain:
+            - domain_name: "{{ avi_domain }}"
+              pass_through: true
+              record_ttl: 100
+          ttl: 300
+        name: "{{ vmw.dns_provider_ref | default('dns-avi')}}"
+        type: IPAMDNS_TYPE_INTERNAL_DNS
+      when:
+        - avi_domain is defined
+      tags:
+        - dns
+
+    - name: Defining variable vcenter_configuration
+      set_fact:
+        vcenter_configuration:
+          username: "{{ vsphere_username }}"
+          password: "{{ vsphere_password }}"
+          vcenter_url: "{{ vsphere_server }}"
+          privilege: WRITE_ACCESS
+          datacenter: "{{ vcenter_dc }}"
+          use_content_lib: true
+          content_lib:
+            id: "{{ content_library_se_id }}"
+            name: "{{ content_library_se_name }}"
+      tags:
+        - cloud
+      when:
+        - vsphere_username is defined
+        - vsphere_password is defined
+        - vsphere_server is defined
+        - vcenter_dc is defined
+        - vsphere_server | ansible.netcommon.ipaddr
+        - content_library_se_id is defined
+        - content_library_se_name is defined
+
+    - name: Defining variable vcenter_configuration
+      set_fact:
+        vcenter_configuration:
+          username: "{{ vsphere_username }}"
+          password: "{{ vsphere_password }}"
+          vcenter_url: "{{ lookup('dig', vsphere_server) }}"
+          privilege: WRITE_ACCESS
+          datacenter: "{{ vcenter_dc }}"
+          use_content_lib: true
+          content_lib:
+            id: "{{ content_library_se_id }}"
+            name: "{{ content_library_se_name }}"
+      tags:
+        - cloud
+      when:
+        - vsphere_username is defined
+        - vsphere_password is defined
+        - vsphere_server is defined
+        - vcenter_dc is defined
+        - not vsphere_server | ansible.netcommon.ipaddr
+        - content_library_se_id is defined
+        - content_library_se_name is defined
+
+    - name: Configure Avi Cloud
+      vmware.alb.avi_cloud:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        name:  "dc1_vCenter"
+        vtype: CLOUD_VCENTER
+        vcenter_configuration: "{{ vcenter_configuration }}"
+        dhcp_enabled: true
+      register: output_cloud_vmw
+      when:
+        - vcenter_configuration is defined
+      tags:
+        - cloud
+        - vmw
+
+    - set_fact:
+        cloud_vmw_uuid: "{{ output_cloud_vmw.obj.uuid }}"
+      when:
+        - output_cloud_vmw is defined
+      tags:
+        - cloud
+        - vmw
+
+    - name: Wait for network sync for cloud to complete...
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "get"
+        path: "cloudruntime"
+        params:
+          name: "dc1_vCenter"
+      register: cloudruntime
+      until: cloudruntime.obj.results[0].network_sync_complete
+      retries: 30
+      delay: 5
+
+    - name: Configure cloud management network
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: "patch"
+        path: '{{ "cloud/" + cloud_vmw_uuid }}'
+        data:
+          replace:
+            vcenter_configuration:
+              management_network: '{{ "/api/vimgrnwruntime/?name=" + vcenter_network_mgmt_name }}'
+      when:
+        - vcenter_network_mgmt_name is defined
+        - cloud_vmw_uuid is defined
+
+    - name: get Network details
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: network
+        params:
+          page_size: -1
+      register: networkOutput
+      tags:
+        - cloud
+        - network
+        - ipamdns
+
+    - name: Define configured_subnets for mgmt network when no DHCP
+      set_fact:
+        configured_subnets:
+          - prefix:
+              mask: "{{ vcenter_network_mgmt_network_cidr.split('/')[1] }}"
+              ip_addr:
+                type: "V4"
+                addr: "{{ vcenter_network_mgmt_network_cidr.split('/')[0] }}"
+            static_ip_ranges:
+              - range:
+                  begin:
+                    type: "V4"
+                    addr: "{{ vcenter_network_mgmt_ipam_pool.0 }}"
+                  end:
+                    type: "V4"
+                    addr: "{{ vcenter_network_mgmt_ipam_pool.1 }}"
+      when:
+        - not vcenter_network_mgmt_dhcp | bool
+        - vcenter_network_mgmt_network_cidr is defined
+        - vcenter_network_mgmt_ipam_pool is defined
+
+    - name: Update Mgmt Network - with DHCP
+      vmware.alb.avi_network:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        avi_api_patch_op : add
+        avi_api_update_method: patch
+        name: "{{ vcenter_network_mgmt_name }}"
+        dhcp_enabled: true
+        exclude_discovered_subnets: true
+      when:
+        - vcenter_network_mgmt_name is defined
+        - vcenter_network_mgmt_dhcp | bool
+      tags:
+        - cloud
+        - network
+        - ipamdns
+
+    - name: Update Mgmt Network - wo DHCP
+      vmware.alb.avi_network:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        avi_api_patch_op : add
+        avi_api_update_method: patch
+        configured_subnets: "{{ configured_subnets }}"
+        name: "{{ vcenter_network_mgmt_name }}"
+        dhcp_enabled: false
+        exclude_discovered_subnets: true
+      register: output_mgmt_network_vmw
+      when:
+        - vcenter_network_mgmt_name is defined
+        - not vcenter_network_mgmt_dhcp | bool
+      tags:
+        - cloud
+        - network
+        - ipamdns
+
+    - name: get Network details
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: network
+        params:
+          page_size: -1
+      register: networkOutput
+      tags:
+        - cloud
+        - network
+        - ipamdns
+
+    - name: Define configured_subnets for vip network
+      set_fact:
+        configured_subnets_vip:
+          - prefix:
+              mask: "{{ vcenter_network_vip_cidr.split('/')[1] }}"
+              ip_addr:
+                type: "V4"
+                addr: "{{ vcenter_network_vip_cidr.split('/')[0] }}"
+            static_ip_ranges:
+              - range:
+                  begin:
+                    type: "V4"
+                    addr: "{{ vcenter_network_vip_ipam_pool.0 }}"
+                  end:
+                    type: "V4"
+                    addr: "{{ vcenter_network_vip_ipam_pool.1 }}"
+      when:
+        - vcenter_network_vip_cidr is defined
+        - vcenter_network_vip_ipam_pool is defined
+
+    - name: Update Vip Network
+      vmware.alb.avi_network:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        name: "{{ vcenter_network_vip_name }}"
+        configured_subnets: "{{ configured_subnets_vip }}"
+        dhcp_enabled: false
+        exclude_discovered_subnets: true
+      register: output_vip_network_vmw
+      when:
+        - vcenter_network_vip_name is defined
+        - configured_subnets_vip is defined
+      tags:
+        - ipam
+
+    - name: get Network details
+      vmware.alb.avi_api_session:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        http_method: get
+        timeout: 300
+        path: network
+        params:
+          page_size: -1
+      register: networkOutput
+      tags:
+        - cloud
+        - network
+        - ipamdns
+
+    - name: Define configured_subnets for K8s network
+      set_fact:
+        configured_subnets_k8s:
+          - prefix:
+              mask: "{{ vcenter_network_k8s_cidr.split('/')[1] }}"
+              ip_addr:
+                type: "V4"
+                addr: "{{ vcenter_network_k8s_cidr.split('/')[0] }}"
+            static_ip_ranges:
+              - range:
+                  begin:
+                    type: "V4"
+                    addr: "{{ vcenter_network_k8s_ipam_pool.0 }}"
+                  end:
+                    type: "V4"
+                    addr: "{{ vcenter_network_k8s_ipam_pool.1 }}"
+      when:
+        - vcenter_network_k8s_cidr is defined
+        - vcenter_network_k8s_ipam_pool is defined
+
+    - name: Update K8s Network
+      vmware.alb.avi_network:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        name: "{{ vcenter_network_k8s_name }}"
+        configured_subnets: "{{ configured_subnets_k8s }}"
+        dhcp_enabled: false
+        exclude_discovered_subnets: true
+      register: output_k8s_network_vmw
+      when:
+        - configured_subnets_k8s is defined
+        - vcenter_network_k8s_name is defined
+      tags:
+        - ipam
+
+    - name: Create Avi IPAM for Mgmt dhcp
+      vmware.alb.avi_ipamdnsproviderprofile:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        internal_profile:
+          usable_networks:
+            - nw_ref: "/api/network/{{ output_vip_network_vmw.obj.uuid }}"
+            - nw_ref: "/api/network/{{ output_k8s_network_vmw.obj.uuid }}"
+        name: "ipam-avi"
+        type: IPAMDNS_TYPE_INTERNAL
+      when:
+        - vcenter_network_mgmt_dhcp | bool
+        - output_vip_network_vmw is defined
+        - output_k8s_network_vmw is defined
+      tags:
+        - ipam
+
+    - name: Create Avi IPAM for Mgmt static
+      vmware.alb.avi_ipamdnsproviderprofile:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        internal_profile:
+          usable_networks:
+            - nw_ref: "/api/network/{{ output_mgmt_network_vmw.obj.uuid }}"
+            - nw_ref: "/api/network/{{ output_vip_network_vmw.obj.uuid }}"
+            - nw_ref: "/api/network/{{ output_k8s_network_vmw.obj.uuid }}"
+        name: "ipam-avi"
+        type: IPAMDNS_TYPE_INTERNAL
+      when:
+        - not vcenter_network_mgmt_dhcp | bool
+        - output_mgmt_network_vmw is defined
+        - output_vip_network_vmw is defined
+        - output_k8s_network_vmw is defined
+      tags:
+        - ipam
+
+    - name: Update Avi Cloud (Vcenter) with IPAM
+      vmware.alb.avi_cloud:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        avi_api_update_method: patch
+        avi_api_patch_op: add
+        name: "dc1_vCenter"
+        vtype: CLOUD_VCENTER
+        vcenter_configuration: "{{ vcenter_configuration }}"
+        dhcp_enabled: true
+        ipam_provider_ref: "/api/ipamdnsproviderprofile/?name=ipam-avi"
+        dns_provider_ref: "/api/ipamdnsproviderprofile/?name=dns-avi"
+      tags:
+        - cloud
+        - ipam
+        - dns
+
+    - name: Modify/Creating SE group - VMW - for K8S cluster
+      vmware.alb.avi_serviceenginegroup:
+        avi_credentials: "{{ avi_credentials | default(omit) }}"
+        api_context: "{{ avi_api_context | default(omit) }}"
+        cloud_ref: "/api/cloud/?name=dc1_vCenter"
+        avi_api_update_method: put
+        name: "Default-Group"
+        vcenter_folder: "{{ vcenter_folder }}"
+      when:
+        - vcenter_folder is defined

@@ -1,0 +1,38 @@
+k get no
+
+helm repo list
+
+helm search repo ako
+
+helm --debug install ako/ako --generate-name --version ${ako_versions} -f values.yml --namespace=avi-system --set avicredentials.username=admin --set avicredentials.password=$avi_password
+
+k get pods -A
+
+k logs -f ako-0 -n avi-system
+
+k apply -f service_loadBalancer.yml
+
+k apply -f deployment.yml
+
+k scale deployment web-front1 --replicas=6
+
+k apply -f ingress.yml
+
+k get ing
+
+k apply -f avi_crd_hostrule_tls_cert.yml
+
+k get HostRule avi-crd-hostrule-tls-cert -o json | jq .status.status
+
+k get secrets
+
+k get secret cert01 -o go-template='{{range $k,$v := .data}}{{"### "}}{{$k}}{{"\n"}}{{$v|base64decode}}{{"\n\n"}}{{end}}'
+
+k apply -f secure_ingress.yml
+
+k get ing
+
+k apply -f avi_crd_hostrule_waf.yml
+
+k get HostRule  avi-crd-hostrule-waf -o json | jq .status.status
+

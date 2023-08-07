@@ -1,0 +1,17 @@
+---
+apiVersion: ako.vmware.com/v1alpha1
+kind: HostRule
+metadata:
+  name: avi-crd-hostrule-waf
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: secure-ingress.cluster1.avi.com
+    enableVirtualHost: true
+    wafPolicy: System-WAF-Policy
+    errorPageProfile: custom_avi_error_page_profile
+    analyticsPolicy: # optional
+      fullClientLogs:
+        enabled: true
+        throttle: HIGH
+      logAllHeaders: true

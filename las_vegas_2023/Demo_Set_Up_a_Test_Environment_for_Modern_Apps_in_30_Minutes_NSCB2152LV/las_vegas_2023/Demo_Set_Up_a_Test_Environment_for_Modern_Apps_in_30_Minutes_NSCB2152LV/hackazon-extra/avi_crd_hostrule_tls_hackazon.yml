@@ -1,0 +1,22 @@
+---
+apiVersion: ako.vmware.com/v1alpha1
+kind: HostRule
+metadata:
+  name: avi-crd-hostrule-hackazon
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: hackazon.default.avi.com
+    enableVirtualHost: true
+    tls: # optional
+      sslKeyCertificate:
+        name: System-Default-Cert-EC
+        type: ref
+        alternateCertificate:
+          name: System-Default-Cert
+          type: ref
+    analyticsPolicy: # optional
+      fullClientLogs:
+        enabled: true
+        throttle: HIGH
+      logAllHeaders: true

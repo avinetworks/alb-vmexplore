@@ -1,0 +1,96 @@
+---
+- hosts: master
+  # gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+    - name: Initialize the cluster
+      become: true
+      shell: |
+        ip=$(ip -f inet addr show {{ kubernetes.interface }} | awk '/inet / {print $2}' | awk -F/ '{print $1}')
+        kubeadm init --pod-network-cidr={{ kubernetes.networks.pod }} --apiserver-advertise-address $ip
+      ignore_errors: no
+      when:
+        - kubernetes.interface is defined
+        - kubernetes.networks.pod
+      tags:
+        - kubeadm
+
+    - name: Setup the kube config file for {{ kubernetes.dockerUser }}
+      become: true
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubeadm
+      with_items:
+        - mkdir -p /home/{{ kubernetes.username }}/.kube
+        - cp -i /etc/kubernetes/admin.conf /home/{{ kubernetes.username }}/.kube/config
+        - chown {{ kubernetes.username }}:{{ kubernetes.username }} /home/{{ kubernetes.username }}/.kube/config
+      when:
+        - kubernetes.username is defined
+    - name: Download yaml file - if Antrea with NPL
+      get_url:
+        url: "{{ kubernetes.cni.url }}"
+        dest: "/home/{{ kubernetes.username }}/{{ kubernetes.cni.url | basename }}"
+      when:
+        - kubernetes.cni.url is defined
+        - kubernetes.username is defined
+        - kubernetes.cni.name == "antrea"
+        - kubernetes.cni.enableNPL | bool
+
+    - name: Enabling NPL - if Antrea with NPL
+      lineinfile:
+        path: "/home/{{ kubernetes.username }}/{{ kubernetes.cni.url | basename }}"
+        regexp: 'NodePortLocal: false'
+        line: '      NodePortLocal: true'
+      when:
+        - kubernetes.cni.url is defined
+        - kubernetes.username is defined
+        - kubernetes.cni.name == "antrea"
+        - kubernetes.cni.enableNPL | bool
+
+    - name: Install CNI - if Antrea with NPL
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+      with_items:
+        - "kubectl apply -f /home/{{ kubernetes.username }}/{{ kubernetes.cni.url | basename }}"
+      when:
+        - kubernetes.cni.url is defined
+        - kubernetes.cni.name == "antrea"
+        - kubernetes.cni.enableNPL | bool
+
+    - name: Install CNI - if Antrea wo NPL
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+      with_items:
+        - kubectl apply -f {{ kubernetes.cni.url }}
+      when:
+        - kubernetes.cni.url is defined
+        - kubernetes.cni.name == "antrea"
+        - not kubernetes.cni.enableNPL | bool
+
+    - name: Install CNI - if not Antrea
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubectl
+      with_items:
+        - kubectl apply -f {{ kubernetes.cni.url }}
+      when:
+        - kubernetes.cni.url is defined
+        - kubernetes.cni.name != "antrea"
+
+    - name: Generate join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Copy join command to local file
+      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
