@@ -1,0 +1,21 @@
+---
+- hosts: workers
+  # gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+    - name: Copy the join command to server location
+      copy: src=join-command dest=/tmp/join-command.sh mode=0777
+      tags:
+        - workers
+
+    - name: Run the command to join the cluster
+      become: true
+      command: sh /tmp/join-command.sh
+      ignore_errors: no
+      tags:
+        - workers

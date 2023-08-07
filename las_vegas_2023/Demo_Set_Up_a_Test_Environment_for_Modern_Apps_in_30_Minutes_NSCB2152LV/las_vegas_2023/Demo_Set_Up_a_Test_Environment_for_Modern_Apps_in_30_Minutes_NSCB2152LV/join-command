@@ -1,0 +1,1 @@
+kubeadm join 10.1.1.200:6443 --token eceof5.rzkg3fdc14edw8p8 --discovery-token-ca-cert-hash sha256:1c8012e0888257bedf44f9dd1dbe72a4e52f33bdcd5e9be82be5b8a35b93fdef 

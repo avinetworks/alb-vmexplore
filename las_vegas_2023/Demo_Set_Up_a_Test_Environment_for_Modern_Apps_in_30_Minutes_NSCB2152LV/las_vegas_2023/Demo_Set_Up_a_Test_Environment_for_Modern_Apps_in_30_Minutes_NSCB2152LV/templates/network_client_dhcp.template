@@ -1,0 +1,13 @@
+network:
+  version: 2
+  ethernets:
+    if_name_primary_to_be_replaced:
+      dhcp4: true
+      link-local: []
+    if_name_secondary_to_be_replaced:
+      dhcp4: false
+      link-local: []
+      addresses:
+        - ${ip4_second}
+      nameservers:
+        addresses: [${avi_dns_vs}]

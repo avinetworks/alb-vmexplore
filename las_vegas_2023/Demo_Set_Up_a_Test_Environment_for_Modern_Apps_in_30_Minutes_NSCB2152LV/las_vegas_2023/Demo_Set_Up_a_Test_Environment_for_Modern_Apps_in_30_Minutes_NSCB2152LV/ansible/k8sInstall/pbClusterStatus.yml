@@ -1,0 +1,71 @@
+---
+- hosts: master
+  gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+
+      - name: checking Status of Nodes
+        block:
+
+          - name: Pausing for 60 seconds
+            pause:
+              minutes: 1
+            tags:
+              - status
+
+          - name: Kubectl command "kubectl get nodes --output=json"
+            command: kubectl get nodes --output=json
+            ignore_errors: no
+            register: kubectlResult
+            tags:
+              - status
+
+          - set_fact:
+              kubectlResultJson: "{{ kubectlResult.stdout | from_json }}"
+            tags:
+              - status
+
+          - debug:
+              msg: "Status for node {{ item['metadata']['name'] }} is {{ item['status']['conditions'][-1]['type'] }}"
+            loop: "{{ kubectlResultJson['items'] }}"
+            loop_control:
+              label: Checking the API item contains ready for each node
+            failed_when:
+              - item['status']['conditions'][-1]['type'] != 'Ready'
+            tags:
+              - status
+
+        rescue:
+
+          - name: Pausing for 180 seconds
+            pause:
+              minutes: 3
+            tags:
+              - status
+
+          - name: Kubectl command "kubectl get nodes --output=json"
+            command: kubectl get nodes --output=json
+            ignore_errors: no
+            register: kubectlResult
+            tags:
+              - status
+
+          - set_fact:
+              kubectlResultJson: "{{ kubectlResult.stdout | from_json }}"
+            tags:
+              - status
+
+          - debug:
+              msg: "Status for node {{ item['metadata']['name'] }} is {{ item['status']['conditions'][-1]['type'] }}"
+            loop: "{{ kubectlResultJson['items'] }}"
+            loop_control:
+              label: Checking the API item contains ready for each node
+            failed_when:
+              - item['status']['conditions'][-1]['type'] != 'Ready'
+            tags:
+              - status

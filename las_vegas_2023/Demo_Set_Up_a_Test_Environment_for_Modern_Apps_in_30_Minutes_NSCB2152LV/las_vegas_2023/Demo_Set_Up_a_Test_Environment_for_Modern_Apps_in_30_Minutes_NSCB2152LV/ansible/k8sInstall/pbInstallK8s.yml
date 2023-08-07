@@ -1,0 +1,80 @@
+---
+- hosts: master, workers
+  gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  vars_files:
+    - "vars/params.yml"
+
+  tasks:
+    - name: Apply new IP config
+      become: true
+      shell: |
+        sudo netplan apply
+        sleep 10
+      when:
+        - kubernetes.netplanApply | bool
+
+    - name: Update repositories cache and install a list of package
+      become: true
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      ignore_errors: no
+      loop: "{{ packageList }}"
+      when: packageList is defined
+      tags:
+        - apt
+
+    - name: Add keys to apt
+      become: true
+      apt_key:
+        url: "{{ item }}"
+      loop: "{{ keyUrl }}"
+      when: keyUrl is defined
+      tags:
+        - apt
+      retries: 3
+
+    - name: Add repo to apt
+      become: true
+      apt_repository:
+        repo: "{{ item }}"
+        state: present
+      loop: "{{ repoUrl }}"
+      when: repoUrl is defined
+      tags:
+        - apt
+
+    - name: Install docker, k8s and helm packages
+      become: true
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      ignore_errors: no
+      loop: "{{ dockerK8sPackages }}"
+      when: dockerK8sPackages is defined
+      tags:
+        - apt
+
+    - name: Add user {{ kubernetes.dockerUser }} to the docker group
+      become: true
+      user:
+        name: "{{ kubernetes.username }}"
+        group: docker
+        append: yes
+      ignore_errors: no
+      when: kubernetes.username is defined
+      tags:
+        - user
+
+    - name: Enable iptables
+      become: true
+      command: "{{ item }}"
+      ignore_errors: no
+      tags:
+        - kubeadm
+      with_items:
+        - echo "net.bridge.bridge-nf-call-iptables=1" | tee -a /etc/sysctl.conf
+        - sysctl -p

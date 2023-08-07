@@ -1,0 +1,119 @@
+#!/bin/bash
+run_cmd() {
+    retry=10
+    pause=60
+    attempt=0
+    echo "############################################################################################"
+    while [ $attempt -ne $retry ]; do
+      if eval "$@"; then
+        echo "$1 PASSED"
+        break
+      else
+        echo "$1 FAILED"
+      fi
+      ((attempt++))
+      sleep $pause
+      if [ $attempt -eq $retry ]; then
+        echo "$1 FAILED after $retry retries" | tee /tmp/cloudInitFailed.log
+        exit 255
+      fi
+    done
+}
+run_cmd 'sudo rm -f /tmp/apt-key.gpg; wget https://packages.cloud.google.com/apt/doc/apt-key.gpg -O /tmp/apt-key.gpg; test $(ls -l /tmp/apt-key.gpg | awk '"'"'{print $5}'"'"') -gt 0'
+run_cmd 'sudo apt-key add /tmp/apt-key.gpg'
+run_cmd 'sudo rm -f /tmp/signing.asc; wget https://baltocdn.com/helm/signing.asc -O /tmp/signing.asc; test $(ls -l /tmp/signing.asc | awk '"'"'{print $5}'"'"') -gt 0'
+run_cmd 'sudo apt-key add /tmp/signing.asc'
+run_cmd 'sudo rm -f /tmp/gpg; wget https://download.docker.com/linux/ubuntu/gpg -O /tmp/gpg; test $(ls -l /tmp/gpg | awk '"'"'{print $5}'"'"') -gt 0'
+run_cmd 'sudo apt-key add /tmp/gpg'
+run_cmd '! sudo add-apt-repository "deb https://apt.kubernetes.io/ kubernetes-xenial main" | grep Err:'
+run_cmd '! sudo add-apt-repository "deb https://baltocdn.com/helm/stable/debian/ all main" | grep Err:'
+run_cmd '! sudo add-apt-repository  "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | grep Err:'
+run_cmd 'apt-get install -y docker-ce=${Docker_version}; ls /usr/bin/docker'
+run_cmd 'apt-get install -y kubeadm=${K8s_version} kubectl=${K8s_version} kubelet=${K8s_version}; ls /usr/bin/kubeadm /usr/bin/kubectl /usr/bin/kubelet'
+run_cmd 'apt-get install -y helm; ls /usr/bin/helm'
+run_cmd 'sudo apt-get install -y jq; ls /usr/bin/jq'
+if_secondary_name=$(sudo dmesg | grep eth0 | tail -1 | awk -F' ' '{print $5}' | sed 's/://')
+if [[ ${dhcp} == true ]] ; then
+  sudo sed -i -e "s/if_name_secondary_to_be_replaced/"$if_secondary_name"/g" /tmp/50-cloud-init.yaml
+  sudo cp /tmp/50-cloud-init.yaml ${net_plan_file}
+fi
+if [[ ${dhcp} == false ]] ; then
+  sudo sed -i -e "s/if_name_secondary_to_be_replaced/"$if_secondary_name"/g" ${net_plan_file}
+fi
+sudo netplan apply
+sleep 10
+#sudo rm /etc/containerd/config.toml
+#sudo systemctl restart containerd
+sudo  bash -c cat << EOF > /etc/containerd/config.toml
+version = 2
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+    SystemdCgroup = true
+EOF
+
+sudo systemctl restart containerd docker
+sudo usermod -a -G docker ubuntu
+sudo kubeadm config images pull
+sudo kubeadm init --pod-network-cidr=${K8s_pod_cidr} --apiserver-advertise-address ${ip_k8s}
+mkdir -p /home/ubuntu/.kube
+sudo cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
+echo "alias k=kubectl" | sudo tee -a /home/ubuntu/.profile
+echo "source <(kubectl completion bash | sed s/kubectl/k/g)" | sudo tee -a /home/ubuntu/.profile
+export KUBECONFIG=/etc/kubernetes/admin.conf
+#
+# docker login if docker_registry_username and docker_registry_password are defined
+#
+docker_registry_username=${docker_registry_username}
+docker_registry_password=${docker_registry_password}
+if [[ -z "$docker_registry_username" || -z "$docker_registry_password" ]]; then
+echo "docker_registry_username and docker_registry_password are not defined"
+else
+ping -c 1 foo
+while [ $? -ne 0 ] ; do sleep 5 ; docker login --username $docker_registry_username --password $docker_registry_password ; done
+fi
+#
+# Download docker images
+#
+run_cmd "docker pull tacobayle/busybox-v1; docker image ls | grep tacobayle/busybox-v1"
+#
+# CNI download images
+#
+cni=${cni_name}
+ako_service_type=${ako_service_type}
+if [ "$cni" == "antrea" ] ; then
+    if [ "$ako_service_type" == "NodePortLocal" ] ; then
+      run_cmd 'wget -O /tmp/antrea.yml.without_nodeportlocal https://github.com/vmware-tanzu/antrea/releases/download/v1.2.3/antrea.yml; test $(ls -l /tmp/antrea.yml.without_nodeportlocal | awk '"'"'{print $5}'"'"') -gt 0'
+      cp /tmp/antrea.yml.without_nodeportlocal /tmp/antrea.yml
+      sed -i -e "s/    #  NodePortLocal: false/      NodePortLocal: true/g" /tmp/antrea.yml
+    else
+      run_cmd 'wget -O /tmp/antrea.yml https://github.com/vmware-tanzu/antrea/releases/download/v1.2.3/antrea.yml; test $(ls -l /tmp/antrea.yml | awk '"'"'{print $5}'"'"') -gt 0'
+    fi
+    run_cmd 'kubectl apply -f /tmp/antrea.yml'
+else
+    if [ "$cni" == "calico" ] ; then
+      run_cmd 'wget -O /tmp/calico.yml https://docs.projectcalico.org/manifests/calico.yaml; test $(ls -l /tmp/calico.yml | awk '"'"'{print $5}'"'"') -gt 0'
+      for image in $(cat /tmp/calico.yml | grep 'image: ' | awk -F 'image: ' '{print $2}'); do image_to_search=$(echo $image | sed -e "s/docker.io\///g" | awk -F':' '{print $1}') ; run_cmd "docker pull $image; docker image ls | grep $image_to_search" ; done
+      run_cmd 'kubectl apply -f /tmp/calico.yml'
+    fi
+    if [ "$cni" == "flannel" ] ; then
+      run_cmd 'wget -O /tmp/flannel.yml https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml; test $(ls -l /tmp/flannel.yml | awk '"'"'{print $5}'"'"') -gt 0'
+      for image in $(cat /tmp/flannel.yml | grep -vE '^\s*(#)' | grep 'image: ' | awk -F 'image: ' '{print $2}'); do image_to_search=$(echo $image | awk -F':' '{print $1}') ; run_cmd "docker pull $image; docker image ls | grep $image_to_search" ; done
+      sudo sed -i -e "s/      \"Network\": \"${default_flannel_pod_network}\/${default_flannel_pod_prefix}\"/      \"Network\": \"${K8s_pod_network}\/${K8s_pod_prefix}\"/g" /tmp/flannel.yml
+      run_cmd 'kubectl apply -f /tmp/flannel.yml'
+    fi
+fi
+#
+# K8s generate join command
+#
+kubeadm token create --print-join-command | tee /home/ubuntu/join-command
+sudo chown ubuntu:ubuntu /home/ubuntu/join-command
+#
+# Change kubelet IP
+#
+sudo cp /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /etc/systemd/system/kubelet.service.d/10-kubeadm.conf.old
+ip=$(ip -f inet addr show $if_secondary_name | awk '/inet / {print $2}' | awk -F/ '{print $1}')
+sudo sed '$${s/$/ --node-ip '$ip'/}' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf.old | sudo tee /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet

@@ -1,0 +1,5 @@
+docker_registry_password = "yourpassword"
+vsphere_password         = "yourpassword"
+vsphere_username         = "yourusername"
+docker_registry_username = "yourusername"
+docker_registry_email    = "youremail"

@@ -1,0 +1,18 @@
+---
+- hosts: master, workers
+  gather_facts: yes
+  become_user: root
+  become_method: sudo
+
+  tasks:
+    - name: patching /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+      shell: |
+        sudo cp /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /etc/systemd/system/kubelet.service.d/10-kubeadm.conf.old
+        ip=$(ip -f inet addr show {{ kubernetes.interface }} | awk '/inet / {print $2}' | awk -F/ '{print $1}')
+        sudo sed '${s/$/ --node-ip '$ip'/}' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf.old | sudo tee /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+        sudo systemctl daemon-reload
+        sudo systemctl restart kubelet
+      ignore_errors: no
+      become: true
+      when:
+        - kubernetes.interface is defined
